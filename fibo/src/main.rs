@@ -46,11 +46,32 @@ fn main() {
         .takes_value(true)
         .value_name("NUMBER")).get_matches();
 
+    let min: u32;
+    let max: u32;
+    let verb: bool;
 
-    for i in 0..51 {
+    match matches.occurrences_of("verbose") {
+        0 => verb=false,
+        _ => verb=true
+    }
+
+    match matches.value_of("min") {
+        None => min = 0,
+        Some(v) => min = v.parse::<u32>().unwrap()
+    }
+
+    match matches.value_of("VALUE") {
+        None => max = 0,
+        Some(v) => max = v.parse::<u32>().unwrap()
+    }
+
+    let mut current_v:u32 = 0;
+
+    for i in min..max {
         match fibo(i) {
             None => break,
-            Some(v) => println!("{}", v)
+            Some(v) => if verb {println!("{}", v);} else {current_v = v;}
         }
     }
+    if !verb {println!("{}", current_v)};
 }
