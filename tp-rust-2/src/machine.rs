@@ -135,7 +135,7 @@ impl Machine{
 
     /// Sets an adress in memory to the given value.
     pub fn set_mem(&mut self, addr: usize, value: u32) -> Result<(), MachineError> {
-        if addr > MEMORY_SIZE {return Err(MachineError::AdressOutOfMemory)}
+        if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
         else {
             self.memory[addr] = value as u8;
             return Ok(());
@@ -144,7 +144,7 @@ impl Machine{
 
     /// Loads a value from given address in memory in given register.
     pub fn load_mem(&mut self, addr: usize, reg: u8) -> Result<(), MachineError> {
-        if addr > MEMORY_SIZE {return Err(MachineError::AdressOutOfMemory)}
+        if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
         if reg > 15 {return Err(MachineError::RegOutOfScale)}
         else {
             self.registers[reg as usize] = self.memory[addr as usize] as u32;
