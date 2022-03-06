@@ -6,8 +6,8 @@ const NREGS: usize = 16;
 const IP: usize = 0;
 
 pub struct Machine{
-    memory: [u8; 4096],
-    registers: [u32;16]
+    memory: [u8; MEMORY_SIZE],
+    registers: [u32;NREGS]
 }
 
 #[derive(Debug)]
@@ -99,7 +99,6 @@ impl Machine{
         else {
             let instr_id: u8 = self.memory[pc];
             let res:Result<(), MachineError>;
-            println!("Instr_id : {}", instr_id);
             if instr_id==7 {return self.exit()}
             match instr_id {
                 1 => res = self.move_if(),
@@ -134,7 +133,6 @@ impl Machine{
     pub fn set_reg(&mut self, reg: u8, value: u32) -> Result<(), MachineError> {
         if reg > 15 {return Err(MachineError::RegOutOfScale)}
         else {
-            println!("register : {} set to value : {}", reg, value);
             self.registers[reg as usize] = value;
             return Ok(());
         }
@@ -145,10 +143,10 @@ impl Machine{
         if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
         else {
             let reg_value:[u8;4] = value.to_be_bytes();
-            self.memory[addr] = reg_value[0];
-            self.memory[addr+1] = reg_value[1];
-            self.memory[addr+2] = reg_value[2];
-            self.memory[addr+3] = reg_value[3];
+            self.memory[addr] = reg_value[3];
+            self.memory[addr+1] = reg_value[2];
+            self.memory[addr+2] = reg_value[1];
+            self.memory[addr+3] = reg_value[0];
             return Ok(());
         }
     }
@@ -189,7 +187,9 @@ impl Machine{
         let reg_a: u8 = self.memory[(self.get_ip()+1) as usize];
         let reg_b: u8 = self.memory[(self.get_ip()+2) as usize];
         self.registers[0] += 3;
-        self.set_mem(self.registers[reg_a as usize] as usize, self.registers[reg_b as usize])
+        if reg_b>15 || reg_a>15 {return Err(MachineError::RegOutOfScale)}
+        else if self.registers[reg_a as usize] as usize > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
+        else {self.set_mem(self.registers[reg_a as usize] as usize, self.registers[reg_b as usize])}
     }
 
     /// 3 regA regB : 
@@ -198,7 +198,9 @@ impl Machine{
         let reg_a: u8 = self.memory[(self.get_ip()+1) as usize];
         let reg_b: u8 = self.memory[(self.get_ip()+2) as usize];
         self.registers[0] += 3;
-        self.load_mem(self.registers[reg_b as usize] as usize, reg_a)
+        if reg_a>15 || reg_b>15 {return Err(MachineError::RegOutOfScale)}
+        else if self.registers[reg_b as usize] as usize > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
+        else {self.load_mem(self.registers[reg_b as usize] as usize, reg_a)}
     }
 
     /// 4 regA L H : 
@@ -207,10 +209,7 @@ impl Machine{
         let reg_a: u8 = self.memory[(self.get_ip()+1) as usize];
         let l: u8 = self.memory[(self.get_ip()+2) as usize];
         let h: u8 = self.memory[(self.get_ip()+3) as usize];
-        println!("l : {}", l);
-        println!("h : {}", h);
         let new_reg_value:u32 = (((l as i16) + ((h as i16) <<8)) as i32) as u32;
-        println!("new reg value {}", new_reg_value);
         self.registers[0] += 4;
         if reg_a > 15 {return Err(MachineError::RegOutOfScale)}
         else {
@@ -229,7 +228,10 @@ impl Machine{
         let reg_c: u8 = self.memory[(self.get_ip()+3) as usize];
         self.registers[0] += 4;
         if reg_b > 15 || reg_c > 15 {return Err(MachineError::RegOutOfScale)}
-        else {self.set_reg(reg_a, self.registers[reg_b as usize]-self.registers[reg_c as usize])}
+        else {
+            let value = self.registers[reg_b as usize].wrapping_sub(self.registers[reg_c as usize]);
+            self.set_reg(reg_a, value)
+        }
     }
 
     /// 6 regA : 
@@ -264,7 +266,7 @@ impl Machine{
         self.registers[0] += 2;
         if reg_a > 15 {return Err(MachineError::RegOutOfScale)}
         else {
-            let number = self.registers[reg_a as usize] as u32;
+            let number: i32 = self.registers[reg_a as usize] as i32;
             let dec = number.to_string();
             match fd.write(dec.as_bytes()) {
                 Ok(_c) => return Ok(()),
