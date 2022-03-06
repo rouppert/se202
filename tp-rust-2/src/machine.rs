@@ -29,6 +29,13 @@ pub enum MachineError {
 
 }
 
+fn as_u32(array: &[u8; 4]) -> u32 {
+    ((array[0] as u32) <<  0) +
+    ((array[1] as u32) <<  8) +
+    ((array[2] as u32) << 16) +
+    ((array[3] as u32) << 24)
+}
+
 impl Machine{
     /// Create a new machine in its reset state. The `memory` parameter will
     /// be copied at the beginning of the machine memory.
@@ -137,7 +144,11 @@ impl Machine{
     pub fn set_mem(&mut self, addr: usize, value: u32) -> Result<(), MachineError> {
         if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
         else {
-            self.memory[addr] = value as u8;
+            let reg_value:[u8;4] = value.to_be_bytes();
+            self.memory[addr] = reg_value[0];
+            self.memory[addr+1] = reg_value[1];
+            self.memory[addr+2] = reg_value[2];
+            self.memory[addr+3] = reg_value[3];
             return Ok(());
         }
     }
@@ -147,7 +158,8 @@ impl Machine{
         if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
         if reg > 15 {return Err(MachineError::RegOutOfScale)}
         else {
-            self.registers[reg as usize] = self.memory[addr as usize] as u32;
+            let new_reg_value: [u8; 4] = [self.memory[addr as usize], self.memory[(addr as usize)+1], self.memory[(addr as usize)+2], self.memory[(addr as usize)+3]];
+            self.registers[reg as usize] = as_u32(&new_reg_value);
             return Ok(());
         }
     }
@@ -195,10 +207,14 @@ impl Machine{
         let reg_a: u8 = self.memory[(self.get_ip()+1) as usize];
         let l: u8 = self.memory[(self.get_ip()+2) as usize];
         let h: u8 = self.memory[(self.get_ip()+3) as usize];
+        println!("l : {}", l);
+        println!("h : {}", h);
+        let new_reg_value:u32 = (((l as i16) + ((h as i16) <<8)) as i32) as u32;
+        println!("new reg value {}", new_reg_value);
         self.registers[0] += 4;
         if reg_a > 15 {return Err(MachineError::RegOutOfScale)}
         else {
-            self.registers[reg_a as usize] = (((l as u16) << 8) | h as u16) as u32;
+            self.registers[reg_a as usize] = new_reg_value;
             return Ok(())
         }
 
