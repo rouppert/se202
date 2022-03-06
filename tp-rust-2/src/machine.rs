@@ -99,6 +99,7 @@ impl Machine{
         else {
             let instr_id: u8 = self.memory[pc];
             let res:Result<(), MachineError>;
+            println!("instr_id : {}", instr_id);
             if instr_id==7 {return self.exit()}
             match instr_id {
                 1 => res = self.move_if(),
