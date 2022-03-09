@@ -141,7 +141,7 @@ impl Machine{
 
     /// Sets an adress in memory to the given value.
     pub fn set_mem(&mut self, addr: usize, value: u32) -> Result<(), MachineError> {
-        if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
+        if addr > MEMORY_SIZE-4 {return Err(MachineError::AdressOutOfMemory)}
         else {
             let reg_value:[u8;4] = value.to_be_bytes();
             self.memory[addr] = reg_value[3];
@@ -154,7 +154,7 @@ impl Machine{
 
     /// Loads a value from given address in memory in given register.
     pub fn load_mem(&mut self, addr: usize, reg: u8) -> Result<(), MachineError> {
-        if addr > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
+        if addr > MEMORY_SIZE-4 {return Err(MachineError::AdressOutOfMemory)}
         if reg > 15 {return Err(MachineError::RegOutOfScale)}
         else {
             let new_reg_value: [u8; 4] = [self.memory[addr as usize], self.memory[(addr as usize)+1], self.memory[(addr as usize)+2], self.memory[(addr as usize)+3]];
@@ -189,8 +189,10 @@ impl Machine{
         let reg_b: u8 = self.memory[(self.get_ip()+2) as usize];
         self.registers[0] += 3;
         if reg_b>15 || reg_a>15 {return Err(MachineError::RegOutOfScale)}
-        else if self.registers[reg_a as usize] as usize > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
-        else {self.set_mem(self.registers[reg_a as usize] as usize, self.registers[reg_b as usize])}
+        else if self.registers[reg_a as usize] as usize > MEMORY_SIZE-4 {return Err(MachineError::AdressOutOfMemory)}
+        else {
+            self.set_mem(self.registers[reg_a as usize] as usize, self.registers[reg_b as usize])
+        }
     }
 
     /// 3 regA regB : 
@@ -200,7 +202,7 @@ impl Machine{
         let reg_b: u8 = self.memory[(self.get_ip()+2) as usize];
         self.registers[0] += 3;
         if reg_a>15 || reg_b>15 {return Err(MachineError::RegOutOfScale)}
-        else if self.registers[reg_b as usize] as usize > MEMORY_SIZE-5 {return Err(MachineError::AdressOutOfMemory)}
+        else if self.registers[reg_b as usize] as usize > MEMORY_SIZE-4 {return Err(MachineError::AdressOutOfMemory)}
         else {self.load_mem(self.registers[reg_b as usize] as usize, reg_a)}
     }
 
@@ -243,10 +245,7 @@ impl Machine{
         if reg_a > 15 {return Err(MachineError::RegOutOfScale)}
         else {
             let code = self.registers[reg_a as usize] as u32;
-            let unichar: Option<char> = char::from_u32(code);
-            if unichar == None {return Err(MachineError::NotUnicode)}
-            let c = unichar.unwrap().to_string();
-            match fd.write(c.as_bytes()) {
+            match write!(fd, "{}", char::from_u32(code & 0xff).ok_or(MachineError::NotUnicode)?) {
                 Ok(_c) => return Ok(()),
                 Err(_e) => return Err(MachineError::CouldNotWrite)
             };
