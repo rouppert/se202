@@ -1,13 +1,5 @@
 #![no_std]
-#[cfg(test)]
 
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
 
 pub mod image {
     const RED: Color = Color {r: 0xff, g: 0x00, b: 0x00};
@@ -19,6 +11,7 @@ pub mod image {
     #[derive(Copy)]
     #[derive(Default)]
     #[repr(C)]
+    /// represents an individual RGB pixel
     pub struct Color {
         pub r: u8,
         pub g: u8,
@@ -26,6 +19,7 @@ pub mod image {
     }
 
     #[repr(transparent)]
+    /// represents a whole 8×8 image made of pixels
     pub struct Image(pub [Color; 64]);
 }
 
@@ -49,6 +43,7 @@ mod gamma {
     0xe7, 0xe9, 0xea, 0xec, 0xee, 0xef, 0xf1, 0xf3, 0xf4, 0xf6, 0xf8, 0xf9, 0xfb, 0xfd, 0xfe, 0xff,
     ];
     
+    /// Applies gamma correction for a primary color.
     pub fn gamma_correct(x: u8) -> u8 {
         return GAMMA_TAB[x as usize];
     }
@@ -112,21 +107,25 @@ impl AsMut<[u8; 192]> for Image {
 }
 
 impl Color {
+    /// Applies gamma correction for a pixel.
     pub fn gamma_correct(&self) -> Self {
         return Color {r: gamma::gamma_correct(self.r), g: gamma::gamma_correct(self.g), b: gamma::gamma_correct(self.b)}
     }
 }
 
 impl Image {
+    /// Creates a new image filled with one unique color.
     pub fn new_solid(color: Color) -> Self {
         return Image([color; 64])
     }
 
+    /// Returns reference on a row in an image.
     pub fn row(&self, row: usize) -> &[Color] {
         assert!(row<8, "There's only 8 rows in the image");
         return &self.0[row*8..(row+1)*8];
     }
 
+    /// Creates a new image filled with a gradient of colors.
     pub fn gradient(color: Color) -> Self {
         let mut new_image: Image = Default::default();
         let mut index = 0;
