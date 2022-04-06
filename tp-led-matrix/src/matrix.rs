@@ -71,7 +71,7 @@ impl Matrix {
         delay.delay_ms(100u8);
         matrix.rst.set_high();
         matrix.init_bank0();
-        return matrix
+        matrix
     }
 
     /// Make a brief high pulse of the SCK pin
@@ -138,8 +138,9 @@ impl Matrix {
     /// restored to high.
     fn init_bank0(&mut self) {
         self.sb.set_low();
-        for i in 0..23 {
-            self.send_byte(0xff);
+        for i in 0..144 {
+            self.sda.set_high();
+            self.pulse_sck();
         }
         self.pulse_lat();
         self.sb.set_high();
