@@ -4,7 +4,7 @@ use stm32l4xx_hal::delay::DelayCM;
 use stm32l4xx_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
 use stm32l4xx_hal::{gpio::*, rcc::Clocks};
 
-use crate::{Image, Color};
+use crate::{Image, Color, gamma};
 
 pub struct Matrix {
     sb: PC5<Output<PushPull>>,
@@ -105,7 +105,7 @@ impl Matrix {
     fn send_byte(&mut self, pixel: u8) {
         let mut i=7;
         while i>=0 {
-            match pixel & (1<<i) {
+            match pixel>>i & 1 {
                 0=>self.sda.set_low(),
                 _=>self.sda.set_high()
 
@@ -120,14 +120,13 @@ impl Matrix {
     /// must be applied to every pixel before sending them. The previous row must
     /// be deactivated and the new one activated.
     pub fn send_row(&mut self, row: usize, pixels: &[Color]) {
-        let prec_row = (row-1)%7;
+        let prec_row = (row-1)%8;
         self.row(prec_row, PinState::Low);
         for i in (0..8).rev() {
-            let mut current: Color = pixels[i];
-            current.gamma_correct();
-            self.send_byte(current.b);
-            self.send_byte(current.g);
-            self.send_byte(current.r);
+            let current: Color = pixels[i];
+            self.send_byte(gamma::gamma_correct(current.b));
+            self.send_byte(gamma::gamma_correct(current.g));
+            self.send_byte(gamma::gamma_correct(current.r));
         }
         self.pulse_lat();
         self.row(row, PinState::High);

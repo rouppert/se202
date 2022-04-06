@@ -1,4 +1,6 @@
 use crate::gamma;
+use micromath::F32Ext;
+
 
 
 pub const RED: Color = Color {r: 0xff, g: 0x00, b: 0x00};
@@ -24,13 +26,12 @@ pub struct Image(pub [Color; 64]);
 impl core::ops::Mul<f32> for Color{
 type Output = Self;
 fn mul(self, rhs: f32) -> Self {
-    let new_r = (self.r as f32)*rhs;
-    let new_b = (self.b as f32)*rhs;
-    let new_g = (self.g as f32)*rhs;
-    assert!(new_r<u8::MAX as f32, "Result can't be stored in a color");
-    assert!(new_b<u8::MAX as f32, "Result can't be stored in a color");
-    assert!(new_g<u8::MAX as f32, "Result can't be stored in a color");
-    return Color {r: new_r as u8, b: new_b as u8, g: new_g as u8};
+    let f = |col: u8| ((col as f32*rhs).max(0.0).min(255.0).round() as u8);
+    Color {
+        r: f(self.r),
+        g: f(self.g),
+        b: f(self.b),
+    }
 }
 }
 
@@ -93,14 +94,13 @@ impl Image {
 
     /// Creates a new image filled with a gradient of colors.
     pub fn gradient(color: Color) -> Self {
-        let mut new_image: Image = Default::default();
+        let mut new_image: Image = Image::new_solid(color);
         let mut index = 0;
-        for c in new_image.0 {
-            let row = index/8;
-            let col = index%8;
-            new_image.0[index] = c/((1 + row * row + col) as f32);
-            index+=1;
+        for row in 0..8 {
+            for col in 0..8 {
+                new_image[(row, col)] = color/(1 + row * row + col) as f32;
+            }
         }
-        return new_image
+        new_image
     }
 }
