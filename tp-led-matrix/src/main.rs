@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#[rtic::app(device = pac, dispatchers = [USART2])]
+#[rtic::app(device = pac, dispatchers = [USART2, USART3])]
 
 mod app {
     use tp_led_matrix::{Image, Color, matrix::Matrix, image};
@@ -17,28 +17,53 @@ mod app {
     type Instant = <MyMonotonic as rtic::Monotonic>::Instant;
 
     #[shared]
-    struct Shared {}
+    struct Shared {
+        image: Image
+    }
 
     #[local]
     struct Local {
-        matrix: Matrix,
-        image: Image
+        matrix: Matrix
     }
 
     #[idle(local = [])]
     fn idle(cx: idle::Context) -> ! {
-        loop {}
+        let mut count: i32 = 0;
+        loop {
+            if count==10_000-1 {defmt::info!("iteration"); count = 0}
+            else {count=count+1;}
+        }
     }
 
-    #[task(local = [matrix, image, next_line: usize = 0])]
-    fn display(cx: display::Context, at: Instant) {
+    #[task(local = [matrix, next_row: usize = 0], shared = [image], priority = 2)]
+    fn display(mut cx: display::Context, at: Instant) {
         // Display line next_line (cx.local.next_line) of
         // the image (cx.local.image) on the matrix (cx.local.matrix).
         // All those are mutable references.
-        cx.local.matrix.send_row(*cx.local.next_line, cx.local.image.row(*cx.local.next_line));
-        // Increment next_line up to 7 and wraparound to 0
-        *cx.local.next_line = (*cx.local.next_line+1)%8;
+        cx.shared.image.lock(|image| {
+            // Here you can use image, which is a &mut Image,
+            // to display the appropriate row
+            cx.local.matrix.send_row(*cx.local.next_row, image.row(*cx.local.next_row));
+            // Increment next_line up to 7 and wraparound to 0
+            *cx.local.next_row = (*cx.local.next_row+1)%8;
+        });
+    
+        
         display::spawn_at(at + 1.secs()/(8*60), at + 1.secs()/(8*60)).unwrap();
+    }
+
+    #[task(local = [], shared = [image], priority = 1)]
+    fn rotate_image(mut cx: rotate_image::Context, color_index: usize) {
+        cx.shared.image.lock(|image| {
+            match(color_index) {
+                0=>*image = Image::gradient(image::RED),
+                1=>*image = Image::gradient(image::GREEN),
+                2=>*image = Image::gradient(image::BLUE),
+                _=>panic!()
+            }
+        });
+        let next: usize = (color_index+1)%3;
+        rotate_image::spawn_after(1.secs(), next).unwrap();
     }
 
     #[init]
@@ -85,11 +110,11 @@ mod app {
             &mut gpioc.otyper,
             clocks);
 
-        let image: Image=Image::gradient(image::BLUE);
-
+        let image = Image::default();
+        rotate_image::spawn(0).unwrap();
         display::spawn(mono.now()).unwrap();
 
         // Return the resources and the monotonic timer
-        (Shared {}, Local { matrix, image }, init::Monotonics(mono))
+        (Shared {image}, Local { matrix }, init::Monotonics(mono))
     }
 }
