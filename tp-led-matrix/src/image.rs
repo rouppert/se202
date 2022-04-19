@@ -21,6 +21,7 @@ pub struct Color {
 
 #[repr(transparent)]
 /// represents a whole 8×8 image made of pixels
+#[derive(Copy, Clone)]
 pub struct Image(pub [Color; 64]);
 
 impl core::ops::Mul<f32> for Color{
@@ -73,6 +74,8 @@ fn as_mut(&mut self) -> &mut [u8; 192] {
 }
 }
 
+
+
 impl Color {
     /// Applies gamma correction for a pixel.
     pub fn gamma_correct(&self) -> Self {
@@ -95,7 +98,6 @@ impl Image {
     /// Creates a new image filled with a gradient of colors.
     pub fn gradient(color: Color) -> Self {
         let mut new_image: Image = Image::new_solid(color);
-        let mut index = 0;
         for row in 0..8 {
             for col in 0..8 {
                 new_image[(row, col)] = color/(1 + row * row + col) as f32;

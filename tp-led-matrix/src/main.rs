@@ -1,8 +1,9 @@
 #![no_std]
 #![no_main]
-#[rtic::app(device = pac, dispatchers = [USART2, USART3])]
+#[rtic::app(device = pac, dispatchers = [USART2])]
 
 mod app {
+    use stm32l4xx_hal::device::USART1;
     use tp_led_matrix::{Image, Color, matrix::Matrix, image};
     use cortex_m_rt::entry;
     use panic_probe as _;
@@ -10,6 +11,7 @@ mod app {
     use dwt_systick_monotonic::ExtU32;
     use defmt_rtt as _;
     use stm32l4xx_hal::{pac, prelude::*};   // Just to link it in the executable (it provides the vector table)
+    use stm32l4xx_hal::serial::{Config, Event, Rx, Serial};
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
@@ -23,16 +25,15 @@ mod app {
 
     #[local]
     struct Local {
-        matrix: Matrix
+        matrix: Matrix,
+        usart1_rx: Rx<USART1>,
+        next_image: Image
     }
 
     #[idle(local = [])]
     fn idle(cx: idle::Context) -> ! {
         let mut count: i32 = 0;
-        loop {
-            if count==10_000-1 {defmt::info!("iteration"); count = 0}
-            else {count=count+1;}
-        }
+        loop {}
     }
 
     #[task(local = [matrix, next_row: usize = 0], shared = [image], priority = 2)]
@@ -52,18 +53,33 @@ mod app {
         display::spawn_at(at + 1.secs()/(8*60), at + 1.secs()/(8*60)).unwrap();
     }
 
-    #[task(local = [], shared = [image], priority = 1)]
-    fn rotate_image(mut cx: rotate_image::Context, color_index: usize) {
-        cx.shared.image.lock(|image| {
-            match(color_index) {
-                0=>*image = Image::gradient(image::RED),
-                1=>*image = Image::gradient(image::GREEN),
-                2=>*image = Image::gradient(image::BLUE),
-                _=>panic!()
+    #[task(binds = USART1,
+        local = [usart1_rx, next_image, next_pos: usize = 0],
+        shared = [image])]
+    fn receive_byte(mut cx: receive_byte::Context)
+    {
+        let next_image: &mut Image = cx.local.next_image;
+        let next_pos: &mut usize = cx.local.next_pos;
+        if let Ok(b) = cx.local.usart1_rx.read() {
+            // Handle the incoming byte according to the SE203 protocol
+            // and update next_image
+            // Do not forget that next_image.as_mut() might be handy here!
+            if b == 0xff {*next_pos = 0;}
+            else {
+                next_image.as_mut()[*next_pos] =  b;
+                *next_pos += 1;
             }
-        });
-        let next: usize = (color_index+1)%3;
-        rotate_image::spawn_after(1.secs(), next).unwrap();
+            // If the received image is complete, make it available to
+            // the display task.
+            if *next_pos == 8 * 8 * 3 {
+                cx.shared.image.lock(|image| {
+                    // Replace the image content by the new one, for example
+                    // by swapping them, and reset next_pos
+                    *image = *next_image;
+                    *next_pos = 0;
+                });
+            }
+        }
     }
 
     #[init]
@@ -108,13 +124,21 @@ mod app {
             &mut gpiob.otyper,
             &mut gpioc.moder,
             &mut gpioc.otyper,
-            clocks);
-
+            clocks);        
+            
+        let rx = gpiob.pb7.into_alternate::<7>(&mut gpiob.moder,&mut gpiob.otyper,&mut gpiob.afrl);
+        let tx = gpiob.pb6.into_alternate::<7>(&mut gpiob.moder,&mut gpiob.otyper,&mut gpiob.afrl);
+        let config = stm32l4xx_hal::serial::Config::default().baudrate(38400.bps());
+        let mut serial = stm32l4xx_hal::serial::Serial::usart1(dp.USART1, (tx, rx), config, clocks, &mut rcc.apb2);
+        serial.listen(Event::Rxne);
+        let usart1_rx = serial.split().1;
+        //*cx.next_image = Image::Default();
+        
         let image = Image::default();
-        rotate_image::spawn(0).unwrap();
+        let next_image = Image::default();
         display::spawn(mono.now()).unwrap();
 
         // Return the resources and the monotonic timer
-        (Shared {image}, Local { matrix }, init::Monotonics(mono))
+        (Shared {image}, Local { matrix, usart1_rx, next_image }, init::Monotonics(mono))
     }
 }

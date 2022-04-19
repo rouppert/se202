@@ -1,5 +1,3 @@
-use core::alloc::LayoutErr;
-
 use stm32l4xx_hal::delay::DelayCM;
 use stm32l4xx_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
 use stm32l4xx_hal::{gpio::*, rcc::Clocks};
@@ -120,7 +118,12 @@ impl Matrix {
     /// must be applied to every pixel before sending them. The previous row must
     /// be deactivated and the new one activated.
     pub fn send_row(&mut self, row: usize, pixels: &[Color]) {
-        let prec_row = (row-1)%8;
+        let mut prec_row;
+        match row {
+            n if n>0 => {prec_row = (row-1)%8;},
+            _ => {prec_row = 7;}
+        }
+        
         self.row(prec_row, PinState::Low);
         for i in (0..8).rev() {
             let current: Color = pixels[i];
@@ -137,7 +140,7 @@ impl Matrix {
     /// restored to high.
     fn init_bank0(&mut self) {
         self.sb.set_low();
-        for i in 0..144 {
+        for _i in 0..144 {
             self.sda.set_high();
             self.pulse_sck();
         }
