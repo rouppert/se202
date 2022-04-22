@@ -14,6 +14,7 @@ defmt-rtt = {version = "0.3.2"}
 cortex-m-rtic = {version = "1.0.0"}
 panic-probe = {version = "0.3.0", features = ["print-defmt"]}
 dwt-systick-monotonic = {version = "1.0.0"}
+heapless = {version = "0.7.10"}
 
 [[bin]]
 name = "tp-led-matrix"
